@@ -15,12 +15,13 @@ export class Controls {
     this.solving = false
     this.lastTouch = null
 
+    const frames = this.cube.order <= 10 ? 60 : 30
     this.mousedownHandle = this.mousedownHandle.bind(this)
     this.mouseupHandle = this.mouseupHandle.bind(this)
-    this.mousemoveHandle = this.mousemoveHandle.bind(this)
+    this.mousemoveHandle = throttle(this.mousemoveHandle.bind(this), 1000 / frames)
     this.touchStartHandle = this.touchStartHandle.bind(this)
     this.touchEndHandle = this.touchEndHandle.bind(this)
-    this.touchMoveHandle = this.touchMoveHandle.bind(this)
+    this.touchMoveHandle = throttle(this.touchMoveHandle.bind(this), 1000 / frames)
     this.init()
   }
 
@@ -252,4 +253,33 @@ export class Controls {
 
     return null
   }
+}
+
+function throttle(callback, interval, heading = true, trailing = false) {
+  let last = 0
+  let timer = null
+  const _throttle = function (...args) {
+    const now = Date.now()
+    if (!heading && last === 0) {
+      last = now
+    }
+    const remain = interval - (now - last)
+    if (remain <= 0) {
+      if (timer) {
+        clearTimeout(timer)
+        timer = null
+      }
+      callback.apply(this, args)
+      last = now
+    } else {
+      if (trailing && !timer) {
+        timer = setTimeout(() => {
+          timer = null
+          last = Date.now()
+          callback.apply(this, args)
+        }, remain)
+      }
+    }
+  }
+  return _throttle
 }
