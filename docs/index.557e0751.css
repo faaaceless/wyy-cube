@@ -1,2 +1,0 @@
-*{margin:0;padding:0}#rubik{height:100vh;width:100vw}#side-bar{display:flex;flex-direction:column;font-size:x-large;font-style:italic;position:absolute;right:0;top:15%}#order{background-color:transparent;border:2px solid #000;font-size:large;width:50px}#restore,#shuffle,#solve,#undo{border:3px solid #000;border-radius:5%;margin-top:10px;text-align:center}#restore:hover,#shuffle:hover,#solve:hover,#undo:hover{background-color:#f51212;cursor:pointer}
-/*# sourceMappingURL=index.557e0751.css.map */
