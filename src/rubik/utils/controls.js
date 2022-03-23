@@ -13,6 +13,7 @@ export class Controls {
     this.shuffling = false
     this.undoing = false
     this.solving = false
+    this.lastTouch = null
 
     this.mousedownHandle = this.mousedownHandle.bind(this)
     this.mouseupHandle = this.mouseupHandle.bind(this)
@@ -60,8 +61,10 @@ export class Controls {
 
   touchStartHandle(e) {
     e.preventDefault()
-    if (!e.touches.length === 1) return
-    this.operateStart(e.touches[0].clientX, e.touches[0].clientY)
+    const x = e.touches[0].clientX
+    const y = e.touches[0].clientY
+    this.lastTouch = { x, y }
+    this.operateStart(x, y)
   }
 
   mousemoveHandle(e) {
@@ -71,7 +74,11 @@ export class Controls {
 
   touchMoveHandle(e) {
     e.preventDefault()
-    this.operateDrag(e.touches[0].clientX, e.touches[0].clientY, e.movementX, e.movementY)
+    if (!this.lastTouch) return
+    const x = e.touches[0].clientX
+    const y = e.touches[0].clientY
+    this.operateDrag(x, y, x - this.lastTouch.x, y - this.lastTouch.y)
+    this.lastTouch = { x, y }
   }
 
   mouseupHandle(e) {
@@ -133,6 +140,7 @@ export class Controls {
         this.operating = false
         this.compensation = false
         this.face = null
+        this.lastTouch = null
       }
     }
     animate()
