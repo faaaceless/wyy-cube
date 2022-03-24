@@ -15,13 +15,12 @@ export class Controls {
     this.solving = false
     this.lastTouch = null
 
-    const frames = this.cube.order <= 10 ? 60 : 30
     this.mousedownHandle = this.mousedownHandle.bind(this)
     this.mouseupHandle = this.mouseupHandle.bind(this)
-    this.mousemoveHandle = throttle(this.mousemoveHandle.bind(this), 1000 / frames)
+    this.mousemoveHandle = this.mousemoveHandle.bind(this)
     this.touchStartHandle = this.touchStartHandle.bind(this)
     this.touchEndHandle = this.touchEndHandle.bind(this)
-    this.touchMoveHandle = throttle(this.touchMoveHandle.bind(this), 1000 / frames)
+    this.touchMoveHandle = this.touchMoveHandle.bind(this)
     this.init()
   }
 
@@ -117,8 +116,8 @@ export class Controls {
     } else { // rotate the whole cube
       const movement = Math.sqrt(movementX * movementX + movementY * movementY)
       const moveForHalfPI = this.cube.dragForHalfPI(this.camera, winSize)
-      const rotateAngle = 0.5 * Math.PI * movement / moveForHalfPI
-      this.faces.rotateOnWorldAxis(new Vector3(movementY, movementX, 0).normalize(), 4 * rotateAngle)
+      const rotateAngle = 2 * Math.PI * movement / moveForHalfPI
+      this.faces.rotateOnWorldAxis(new Vector3(movementY, movementX, 0).normalize(), rotateAngle)
     }
     this.renderer.render(this.scene, this.camera)
   }
@@ -174,8 +173,6 @@ export class Controls {
         if (goOn) {
           requestAnimationFrame(animate)
         } else {
-          this.operating = false
-          this.compensation = false
           this.face = null
           resolve()
         }
@@ -184,36 +181,42 @@ export class Controls {
     })
   }
 
-  undo() {
+  doUndo() {
     if (this.operating || this.compensation || this.cube.steps.length === 0) return
-    this.dispose()
     this.undoing = true
-    const info = this.cube.steps.pop()
-    // reverse of infoUpdate in core.js
-    const rotateMat = new Matrix4().makeRotationAxis(info.rotateAxis, -info.rotateAngle % (2 * Math.PI))
-    info.rotateFaces.forEach((face) => {
-      face.applyMatrix4(rotateMat)
-      face.updateMatrix()
-      const normal = face.info.normal.clone().applyMatrix4(rotateMat)
-      const position = face.info.position.clone().applyMatrix4(rotateMat)
-      face.info.normal = closestNormal(normal)
-      face.info.position = closestPosition(this.cube.order, this.cube.size, position)
-      face.position.copy(face.info.position)
+    this.dispose()
+    let info
+    while (this.cube.steps.length > 0) {
+      info = this.cube.steps.pop()
+      if (info.rotateAngle !== 0) break
+    }
+    if (info.rotateAngle === 0) {
+      if (!this.solving) this.init()
+      this.undoing = false
+      return
+    }
+    this.undo(info).then(() => {
+      if (!this.solving) this.init()
+      this.undoing = false
     })
-    if (!this.solving) this.init()
-    this.undoing = false
   }
 
-  solve() {
-    let tick = 0
-    const speed = Math.ceil(120 / this.cube.steps.length)
+  undo(info) {
+    const rotate = makeRotateAnimate(-info.rotateAngle % (2 * Math.PI), info.rotateAxis, info.rotateFaces)
     return new Promise((resolve) => {
       const animate = () => {
-        if (this.cube.steps.length > 0) {
-          if (tick % speed === 0) this.undo()
-          tick++
+        const goOn = rotate()
+        if (goOn) {
           requestAnimationFrame(animate)
         } else {
+          const rotateMat = new Matrix4().makeRotationAxis(info.rotateAxis, -info.rotateAngle % (2 * Math.PI))
+          info.rotateFaces.forEach((face) => {
+            const normal = face.info.normal.clone().applyMatrix4(rotateMat)
+            const position = face.info.position.clone().applyMatrix4(rotateMat)
+            face.info.normal = closestNormal(normal)
+            face.info.position = closestPosition(this.cube.order, this.cube.size, position)
+            face.position.copy(face.info.position)
+          })
           resolve()
         }
       }
@@ -225,10 +228,14 @@ export class Controls {
     if (this.operating || this.compensation) return
     this.dispose()
     this.solving = true
-    this.solve().then(() => {
-      this.init()
-      this.solving = false
-    })
+    while (this.cube.steps.length > 0) {
+      const info = this.cube.steps.pop()
+      if (info.rotateAngle !== 0) {
+        await this.undo(info)
+      }
+    }
+    this.init()
+    this.solving = false
   }
 
   getIntersects(offsetX, offsetY) {
@@ -255,31 +262,28 @@ export class Controls {
   }
 }
 
-function throttle(callback, interval, heading = true, trailing = false) {
-  let last = 0
-  let timer = null
-  const _throttle = function (...args) {
-    const now = Date.now()
-    if (!heading && last === 0) {
-      last = now
-    }
-    const remain = interval - (now - last)
-    if (remain <= 0) {
-      if (timer) {
-        clearTimeout(timer)
-        timer = null
+function makeRotateAnimate(angleToFix, axis, faces) {
+  const frames = 10
+  const speed = 0.5 * Math.PI / frames
+  let rotatedAngle = 0
+
+  const rotate = () => {
+    if (rotatedAngle < Math.abs(angleToFix)) {
+      let curAngle = speed
+      if (rotatedAngle + curAngle > Math.abs(angleToFix)) {
+        curAngle = Math.abs(angleToFix) - rotatedAngle
       }
-      callback.apply(this, args)
-      last = now
+      rotatedAngle += curAngle
+      curAngle = angleToFix > 0 ? curAngle : -curAngle
+      const rotateMat = new Matrix4().makeRotationAxis(axis, curAngle)
+      faces.forEach((face) => {
+        face.applyMatrix4(rotateMat)
+        face.updateMatrix()
+      })
+      return true
     } else {
-      if (trailing && !timer) {
-        timer = setTimeout(() => {
-          timer = null
-          last = Date.now()
-          callback.apply(this, args)
-        }, remain)
-      }
+      return false
     }
   }
-  return _throttle
+  return rotate
 }

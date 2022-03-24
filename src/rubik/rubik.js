@@ -36,11 +36,11 @@ export class Rubik {
 
   undo() {
     if (this.controls.undoing || this.controls.shuffling || this.controls.solving) return
-    this.controls.undo()
+    this.controls.doUndo()
   }
 
   solve() {
-    if (this.controls.undoing || this.controls.shuffling) return
+    if (this.controls.undoing || this.controls.shuffling || this.controls.solving) return
     this.controls.doSolve()
   }
 
