@@ -15,12 +15,13 @@ export class Controls {
     this.solving = false
     this.lastTouch = null
 
+    const frames = this.cube.order < 10 ? 60 : 30
     this.mousedownHandle = this.mousedownHandle.bind(this)
     this.mouseupHandle = this.mouseupHandle.bind(this)
-    this.mousemoveHandle = this.mousemoveHandle.bind(this)
+    this.mousemoveHandle = throttle(this.mousemoveHandle.bind(this), 1000 / frames)
     this.touchStartHandle = this.touchStartHandle.bind(this)
     this.touchEndHandle = this.touchEndHandle.bind(this)
-    this.touchMoveHandle = this.touchMoveHandle.bind(this)
+    this.touchMoveHandle = throttle(this.touchMoveHandle.bind(this), 1000 / frames)
     this.init()
   }
 
@@ -56,6 +57,9 @@ export class Controls {
 
   mousedownHandle(e) {
     e.preventDefault()
+    const x = e.offsetX
+    const y = e.offsetY
+    this.lastMouse = { x, y }
     this.operateStart(e.offsetX, e.offsetY)
   }
 
@@ -69,7 +73,11 @@ export class Controls {
 
   mousemoveHandle(e) {
     e.preventDefault()
-    this.operateDrag(e.offsetX, e.offsetY, e.movementX, e.movementY)
+    if (!this.lastMouse) return
+    const x = e.offsetX
+    const y = e.offsetY
+    this.operateDrag(e.offsetX, e.offsetY, x - this.lastMouse.x, y - this.lastMouse.y)
+    this.lastMouse = { x, y }
   }
 
   touchMoveHandle(e) {
@@ -141,6 +149,7 @@ export class Controls {
         this.compensation = false
         this.face = null
         this.lastTouch = null
+        this.lastMouse = null
       }
     }
     animate()
@@ -286,4 +295,33 @@ function makeRotateAnimate(angleToFix, axis, faces) {
     }
   }
   return rotate
+}
+
+function throttle(callback, interval, heading = true, trailing = false) {
+  let last = 0
+  let timer = null
+  const _throttle = function (...args) {
+    const now = Date.now()
+    if (!heading && last === 0) {
+      last = now
+    }
+    const remain = interval - (now - last)
+    if (remain <= 0) {
+      if (timer) {
+        clearTimeout(timer)
+        timer = null
+      }
+      callback.apply(this, args)
+      last = now
+    } else {
+      if (trailing && !timer) {
+        timer = setTimeout(() => {
+          timer = null
+          last = Date.now()
+          callback.apply(this, args)
+        }, remain)
+      }
+    }
+  }
+  return _throttle
 }
